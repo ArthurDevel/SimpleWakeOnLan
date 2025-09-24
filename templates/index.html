@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wake-on-LAN Controller</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .wake-form {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2ecc71;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            text-align: center;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-success {
+            background: rgba(39, 174, 96, 0.2);
+            border: 1px solid rgba(39, 174, 96, 0.5);
+        }
+
+        .status-error {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid rgba(231, 76, 60, 0.5);
+        }
+
+        .status-loading {
+            background: rgba(52, 152, 219, 0.2);
+            border: 1px solid rgba(52, 152, 219, 0.5);
+        }
+
+        .stored-addresses {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stored-addresses h2 {
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+
+        .address-list {
+            list-style: none;
+        }
+
+        .address-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .address-info {
+            flex: 1;
+        }
+
+        .address-mac {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .address-details {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .address-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            opacity: 0.7;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+
+        @media (max-width: 600px) {
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .address-item {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .address-actions {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Wake-on-LAN Controller</h1>
+            <p>Wake up your devices remotely</p>
+        </div>
+
+        <div class="wake-form">
+            <form id="wakeForm">
+                <div class="form-group">
+                    <label for="macAddress">MAC Address *</label>
+                    <input 
+                        type="text" 
+                        id="macAddress" 
+                        name="macAddress" 
+                        placeholder="00:1B:44:11:3A:B7" 
+                        pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+                        required
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="deviceName">Device Name (Optional)</label>
+                    <input 
+                        type="text" 
+                        id="deviceName" 
+                        name="deviceName" 
+                        placeholder="My Gaming PC" 
+                    >
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="wakeButton">
+                        💤 Wake Device
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="refreshButton">
+                        🔄 Refresh List
+                    </button>
+                </div>
+            </form>
+
+            <div id="status"></div>
+        </div>
+
+        <div class="stored-addresses">
+            <h2>📱 Stored Devices</h2>
+            <ul class="address-list" id="addressList">
+                <li class="empty-state">
+                    <div class="loading-spinner"></div>
+                    <p>Loading devices...</p>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        class WOLController {
+            constructor() {
+                this.statusEl = document.getElementById('status');
+                this.addressList = document.getElementById('addressList');
+                this.wakeForm = document.getElementById('wakeForm');
+                this.macAddressInput = document.getElementById('macAddress');
+                this.deviceNameInput = document.getElementById('deviceName');
+                this.wakeButton = document.getElementById('wakeButton');
+                this.refreshButton = document.getElementById('refreshButton');
+                
+                this.init();
+            }
+
+            init() {
+                this.wakeForm.addEventListener('submit', (e) => this.handleWake(e));
+                this.refreshButton.addEventListener('click', () => this.loadStoredAddresses());
+                this.loadStoredAddresses();
+            }
+
+            showStatus(message, type = 'info') {
+                this.statusEl.textContent = message;
+                this.statusEl.className = '';
+                this.statusEl.classList.add(`status-${type}`);
+            }
+
+            async handleWake(e) {
+                e.preventDefault();
+                
+                const macAddress = this.macAddressInput.value.trim();
+                const deviceName = this.deviceNameInput.value.trim();
+
+                if (!macAddress) {
+                    this.showStatus('❌ Please enter a MAC address', 'error');
+                    return;
+                }
+
+                this.wakeButton.disabled = true;
+                this.wakeButton.textContent = '💤 Sending...';
+                this.showStatus('Sending magic packet...', 'loading');
+
+                try {
+                    const response = await fetch('/api/wake', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            mac_address: macAddress,
+                            device_name: deviceName
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        this.showStatus('✅ Wake-on-LAN packet sent successfully!', 'success');
+                        this.loadStoredAddresses(); // Refresh the list
+                        this.wakeForm.reset(); // Clear the form
+                    } else {
+                        this.showStatus(`❌ Error: ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    this.showStatus(`❌ Network error: ${error.message}`, 'error');
+                } finally {
+                    this.wakeButton.disabled = false;
+                    this.wakeButton.textContent = '💤 Wake Device';
+                }
+            }
+
+            async loadStoredAddresses() {
+                try {
+                    const response = await fetch('/api/mac-addresses');
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        this.renderAddressList(data.mac_addresses);
+                    } else {
+                        this.addressList.innerHTML = '<li class="empty-state">❌ Failed to load devices</li>';
+                    }
+                } catch (error) {
+                    this.addressList.innerHTML = '<li class="empty-state">❌ Network error loading devices</li>';
+                }
+            }
+
+            renderAddressList(addresses) {
+                if (addresses.length === 0) {
+                    this.addressList.innerHTML = '<li class="empty-state">No devices stored yet. Wake a device to add it to the list!</li>';
+                    return;
+                }
+
+                this.addressList.innerHTML = addresses.map(addr => `
+                    <li class="address-item">
+                        <div class="address-info">
+                            <div class="address-mac">${addr.mac}</div>
+                            <div class="address-details">
+                                ${addr.device_name} • Last used: ${new Date(addr.last_used).toLocaleString()}
+                            </div>
+                        </div>
+                        <div class="address-actions">
+                            <button class="btn btn-primary" onclick="wolController.wakeDevice('${addr.mac}', '${addr.device_name}')">
+                                💤 Wake
+                            </button>
+                            <button class="btn btn-danger" onclick="wolController.deleteDevice('${addr.mac}')">
+                                🗑️
+                            </button>
+                        </div>
+                    </li>
+                `).join('');
+            }
+
+            async wakeDevice(mac, deviceName) {
+                this.macAddressInput.value = mac;
+                this.deviceNameInput.value = deviceName;
+                this.handleWake(new Event('submit'));
+            }
+
+            async deleteDevice(mac) {
+                if (!confirm(`Delete device ${mac}?`)) return;
+
+                try {
+                    const response = await fetch(`/api/mac-addresses/${encodeURIComponent(mac)}`, {
+                        method: 'DELETE'
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        this.showStatus('✅ Device deleted successfully', 'success');
+                        this.loadStoredAddresses();
+                    } else {
+                        this.showStatus(`❌ Error: ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    this.showStatus(`❌ Network error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        // Initialize the controller when the page loads
+        const wolController = new WOLController();
+    </script>
+</body>
+</html>
