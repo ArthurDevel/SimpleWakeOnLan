@@ -1,8 +1,13 @@
 import os
 import json
+import logging
+import subprocess
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
-from wakeonlan import send_magic_packet
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # --- Configuration ---
 DATA_DIR = '/data'  # Persistent volume mount point
@@ -24,7 +29,7 @@ def load_mac_addresses():
                 return json.load(f)
         return []
     except Exception as e:
-        print(f"Error loading MAC addresses: {e}")
+        logger.error(f"Error loading MAC addresses: {e}")
         return []
 
 def save_mac_addresses(mac_addresses):
@@ -35,7 +40,7 @@ def save_mac_addresses(mac_addresses):
             json.dump(mac_addresses, f, indent=2)
         return True
     except Exception as e:
-        print(f"Error saving MAC addresses: {e}")
+        logger.error(f"Error saving MAC addresses: {e}")
         return False
 
 def add_mac_address(mac_address, device_name=""):
@@ -76,8 +81,10 @@ def index():
 @app.route('/api/wake', methods=['POST'])
 def wake_pc():
     """Receives the request and sends the WOL packet."""
+    logger.info("=== WOL REQUEST RECEIVED ===")
     try:
         data = request.get_json()
+        logger.info(f"Request data: {data}")
         if not data or 'mac_address' not in data:
             return jsonify({"status": "error", "message": "MAC address is required."}), 400
             
@@ -87,20 +94,47 @@ def wake_pc():
         if not validate_mac_address(mac_address):
             return jsonify({"status": "error", "message": "Invalid MAC address format."}), 400
         
-        # Send the magic packet
-        send_magic_packet(mac_address)
+        # Send the magic packet by calling the system's wakeonlan command
+        logger.info(f"Sending WOL packet to MAC: {mac_address} using command-line tool")
+        
+        try:
+            # Get the broadcast address from the environment variable
+            broadcast_address = os.getenv('BROADCAST_ADDRESS')
+            
+            command = ["wakeonlan"]
+            if broadcast_address:
+                logger.info(f"Using broadcast address: {broadcast_address}")
+                command.extend(["-i", broadcast_address])
+            
+            command.append(mac_address)
+ 
+            completed_process = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=True  # This will raise an exception if the command fails
+            )
+            logger.info(f"wakeonlan stdout: {completed_process.stdout.strip()}")
+            logger.info(f"wakeonlan stderr: {completed_process.stderr.strip()}")
+        except FileNotFoundError:
+            logger.error("The 'wakeonlan' command was not found in the container.")
+            raise
+        except subprocess.CalledProcessError as e:
+            logger.error(f"The 'wakeonlan' command failed with exit code {e.returncode}")
+            logger.error(f"Stderr: {e.stderr.strip()}")
+            raise
         
         # Save/update MAC address in storage
         add_mac_address(mac_address, device_name)
         
-        print(f"Sent WOL packet to {mac_address}")
+        logger.info(f"=== SUCCESS: Sent WOL packet to {mac_address} ===")
         return jsonify({
             "status": "success", 
             "message": f"Wake-on-LAN packet sent to {mac_address}."
         })
         
     except Exception as e:
-        print(f"Error sending WOL packet: {e}")
+        logger.error(f"=== ERROR: Failed to send WOL packet: {e} ===")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/mac-addresses', methods=['GET'])
@@ -112,7 +146,7 @@ def get_mac_addresses():
         mac_addresses.sort(key=lambda x: x['last_used'], reverse=True)
         return jsonify({"status": "success", "mac_addresses": mac_addresses})
     except Exception as e:
-        print(f"Error retrieving MAC addresses: {e}")
+        logger.error(f"Error retrieving MAC addresses: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/mac-addresses/<mac_address>', methods=['DELETE'])
@@ -128,7 +162,7 @@ def delete_mac_address(mac_address):
             return jsonify({"status": "error", "message": "Failed to save changes."}), 500
             
     except Exception as e:
-        print(f"Error deleting MAC address: {e}")
+        logger.error(f"Error deleting MAC address: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/health')

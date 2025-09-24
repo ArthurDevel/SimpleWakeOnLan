@@ -14,7 +14,10 @@ Before using this controller, ensure your target devices are properly configured
    - Save and exit
 
 2. **Operating System Setup**:
-   - **Windows**: Device Manager → Network Adapter → Properties → Power Management → Enable "Allow this device to wake the computer"
+   - **Windows**: 
+     - Device Manager → Network Adapter → Properties → Power Management → Enable "Allow this device to wake the computer"
+     - Device Manager → Network Adapter → Properties → Advanced → Disable "Energy Efficient Ethernet"
+     - Control Panel → Power Options → Choose what the power buttons do → Change settings that are currently unavailable → Disable "Turn on fast startup"
    - **Linux**: Check with `ethtool eth0` and enable with `sudo ethtool -s eth0 wol g`
 
 3. **Network Requirements**:
@@ -24,9 +27,9 @@ Before using this controller, ensure your target devices are properly configured
 
 ## Deployment
 
-### Docker Compose (Recommended)
+### Docker Compose (Recommended for Raspberry Pi / Linux)
 
-Use Docker Compose when you want persistent storage for your MAC addresses between container restarts:
+This method is ideal for deployment on a Raspberry Pi or any Linux-based host. It uses `network_mode: host` to give the container direct access to your physical network, which is the most reliable way to ensure Wake-on-LAN packets are delivered.
 
 ```bash
 docker-compose up -d
@@ -34,14 +37,20 @@ docker-compose up -d
 
 Access the web interface at `http://your-server-ip:8000`
 
-### Docker Only
+### Docker Only (Recommended for Raspberry Pi / Linux)
 
-Use plain Docker for testing or when you don't need persistent storage:
+This is the equivalent plain Docker command for a Linux-based host.
 
 ```bash
 docker build -t wake-on-lan .
-docker run -p 8000:8000 wake-on-lan
+docker run --network host wake-on-lan
 ```
+
+### A Note on macOS Development
+
+The `network_mode: host` setting does **not** work on Docker for Mac as it does on Linux. On a Mac, the container's network is attached to a hidden Virtual Machine, not your physical LAN. Therefore, while the container will build and run on your Mac, the Wake-on-LAN packet will not reach your PC.
+
+**This project is intended for deployment on a Linux host like a Raspberry Pi, where it will function correctly.**
 
 ## License
 

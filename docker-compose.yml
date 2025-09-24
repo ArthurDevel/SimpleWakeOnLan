@@ -1,22 +1,13 @@
-version: '3.8'
-
 services:
   wake-on-lan:
     build: .
-    ports:
-      - "8000:8000"
+    network_mode: host
     volumes:
       - wol_data:/data
     environment:
       - FLASK_ENV=production
     restart: unless-stopped
-    networks:
-      - default
 
 volumes:
   wol_data:
     driver: local
-
-networks:
-  default:
-    driver: bridge
