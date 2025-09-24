@@ -98,18 +98,9 @@ def wake_pc():
         logger.info(f"Sending WOL packet to MAC: {mac_address} using command-line tool")
         
         try:
-            # Get the broadcast address from the environment variable
-            broadcast_address = os.getenv('BROADCAST_ADDRESS')
-            
-            command = ["wakeonlan"]
-            if broadcast_address:
-                logger.info(f"Using broadcast address: {broadcast_address}")
-                command.extend(["-i", broadcast_address])
-            
-            command.append(mac_address)
- 
+            # The command will automatically find the correct broadcast interface
             completed_process = subprocess.run(
-                command,
+                ["wakeonlan", mac_address],
                 capture_output=True,
                 text=True,
                 check=True  # This will raise an exception if the command fails
