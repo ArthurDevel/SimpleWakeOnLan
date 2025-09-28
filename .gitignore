@@ -13,6 +13,7 @@ instance/
 
 # Docker
 .dockerignore
+docker-compose.override.yml
 
 # IDE
 .vscode/

@@ -226,6 +226,163 @@
             padding: 40px 20px;
         }
 
+        .checkbox-label {
+            display: flex !important;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: auto !important;
+            margin: 0;
+        }
+
+        .ssh-credentials {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ip-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .ip-input-group input {
+            flex: 1;
+        }
+
+        .ip-input-group button {
+            padding: 15px 20px;
+            white-space: nowrap;
+        }
+
+        .btn-shutdown {
+            background: #e67e22;
+            color: white;
+        }
+
+        .btn-shutdown:hover {
+            background: #d35400;
+        }
+
+        .btn-shutdown:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        /* Shutdown Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transform: scale(0.7);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-title {
+            color: white;
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-body {
+            color: white;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 20px;
+        }
+
+        .modal-body .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .modal-body .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
         @media (max-width: 600px) {
             .form-actions {
                 flex-direction: column;
@@ -274,6 +431,7 @@
                     >
                 </div>
 
+
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" id="wakeButton">
                         💤 Wake Device
@@ -298,6 +456,87 @@
         </div>
     </div>
 
+    <!-- Shutdown Modal -->
+    <div id="shutdownModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">⚡ Force Shutdown Device</h3>
+                <button class="modal-close" onclick="wolController.closeShutdownModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="device-info">
+                    <p><strong>Device:</strong> <span id="modalDeviceName"></span></p>
+                    <p><strong>MAC:</strong> <span id="modalMacAddress"></span></p>
+                </div>
+                <hr style="border: 1px solid rgba(255,255,255,0.2); margin: 20px 0;">
+                
+                <div class="form-group">
+                    <label for="modalIpAddress">IP Address *</label>
+                    <div class="ip-input-group">
+                        <input 
+                            type="text" 
+                            id="modalIpAddress" 
+                            name="modalIpAddress" 
+                            placeholder="192.168.1.100"
+                            pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+                        >
+                        <button type="button" class="btn btn-secondary" id="modalDiscoverIpButton">
+                            🔍 Discover
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modalSshUsername">SSH Username *</label>
+                    <input 
+                        type="text" 
+                        id="modalSshUsername" 
+                        name="modalSshUsername" 
+                        placeholder="administrator" 
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="modalSshPassword">SSH Password *</label>
+                    <input 
+                        type="password" 
+                        id="modalSshPassword" 
+                        name="modalSshPassword" 
+                        placeholder="••••••••••" 
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="modalSshPort">SSH Port (Optional)</label>
+                    <input 
+                        type="number" 
+                        id="modalSshPort" 
+                        name="modalSshPort" 
+                        placeholder="22" 
+                        min="1" 
+                        max="65535"
+                        value="22"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="saveCredentials" name="saveCredentials" checked> 
+                        💾 Save SSH credentials for this device
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="wolController.closeShutdownModal()">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-shutdown" id="confirmShutdownButton">
+                    ⚡ Force Shutdown
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         class WOLController {
             constructor() {
@@ -309,14 +548,40 @@
                 this.wakeButton = document.getElementById('wakeButton');
                 this.refreshButton = document.getElementById('refreshButton');
                 
+                // Modal elements
+                this.shutdownModal = document.getElementById('shutdownModal');
+                this.modalDeviceName = document.getElementById('modalDeviceName');
+                this.modalMacAddress = document.getElementById('modalMacAddress');
+                this.modalIpAddress = document.getElementById('modalIpAddress');
+                this.modalSshUsername = document.getElementById('modalSshUsername');
+                this.modalSshPassword = document.getElementById('modalSshPassword');
+                this.modalSshPort = document.getElementById('modalSshPort');
+                this.modalDiscoverIpButton = document.getElementById('modalDiscoverIpButton');
+                this.confirmShutdownButton = document.getElementById('confirmShutdownButton');
+                this.saveCredentials = document.getElementById('saveCredentials');
+                
+                // Current shutdown device data
+                this.currentShutdownDevice = null;
+                
                 this.init();
             }
 
             init() {
                 this.wakeForm.addEventListener('submit', (e) => this.handleWake(e));
                 this.refreshButton.addEventListener('click', () => this.loadStoredAddresses());
+                this.modalDiscoverIpButton.addEventListener('click', () => this.discoverIPInModal());
+                this.confirmShutdownButton.addEventListener('click', () => this.executeShutdown());
+                
+                // Close modal on background click
+                this.shutdownModal.addEventListener('click', (e) => {
+                    if (e.target === this.shutdownModal) {
+                        this.closeShutdownModal();
+                    }
+                });
+                
                 this.loadStoredAddresses();
             }
+
 
             showStatus(message, type = 'info') {
                 this.statusEl.textContent = message;
@@ -389,30 +654,192 @@
                     return;
                 }
 
-                this.addressList.innerHTML = addresses.map(addr => `
-                    <li class="address-item">
-                        <div class="address-info">
-                            <div class="address-mac">${addr.mac}</div>
-                            <div class="address-details">
-                                ${addr.device_name} • Last used: ${new Date(addr.last_used).toLocaleString()}
+                this.addressList.innerHTML = addresses.map(addr => {
+                    const hasSSH = addr.ssh_enabled && addr.ip_address && addr.ssh_username;
+                    const sshInfo = hasSSH ? ` • 🔑 SSH: ${addr.ip_address}` : '';
+                    
+                    return `
+                        <li class="address-item">
+                            <div class="address-info">
+                                <div class="address-mac">${addr.mac}</div>
+                                <div class="address-details">
+                                    ${addr.device_name} • Last used: ${new Date(addr.last_used).toLocaleString()}${sshInfo}
+                                </div>
                             </div>
-                        </div>
-                        <div class="address-actions">
-                            <button class="btn btn-primary" onclick="wolController.wakeDevice('${addr.mac}', '${addr.device_name}')">
-                                💤 Wake
-                            </button>
-                            <button class="btn btn-danger" onclick="wolController.deleteDevice('${addr.mac}')">
-                                🗑️
-                            </button>
-                        </div>
-                    </li>
-                `).join('');
+                            <div class="address-actions">
+                                <button class="btn btn-primary" onclick="wolController.wakeDevice('${addr.mac}', '${addr.device_name}')">
+                                    💤 Wake
+                                </button>
+                                <button class="btn btn-shutdown" onclick="wolController.openShutdownModal('${addr.mac}', '${addr.device_name}')">
+                                    ⚡ Force Shutdown
+                                </button>
+                                <button class="btn btn-danger" onclick="wolController.deleteDevice('${addr.mac}')">
+                                    🗑️
+                                </button>
+                            </div>
+                        </li>
+                    `;
+                }).join('');
             }
 
             async wakeDevice(mac, deviceName) {
                 this.macAddressInput.value = mac;
                 this.deviceNameInput.value = deviceName;
                 this.handleWake(new Event('submit'));
+            }
+
+            async openShutdownModal(mac, deviceName) {
+                this.currentShutdownDevice = { mac, deviceName };
+                
+                // Populate modal with device info
+                this.modalDeviceName.textContent = deviceName;
+                this.modalMacAddress.textContent = mac;
+                
+                // Try to find existing SSH credentials for this device
+                try {
+                    const response = await fetch('/api/mac-addresses');
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        const device = data.mac_addresses.find(addr => 
+                            addr.mac.toLowerCase() === mac.toLowerCase()
+                        );
+                        
+                        if (device && device.ssh_enabled) {
+                            // Pre-populate with saved credentials
+                            this.modalIpAddress.value = device.ip_address || '';
+                            this.modalSshUsername.value = device.ssh_username || '';
+                            this.modalSshPassword.value = ''; // Don't show saved password
+                            this.modalSshPort.value = device.ssh_port || '22';
+                            this.saveCredentials.checked = true;
+                        } else {
+                            // Clear form fields for new device
+                            this.modalIpAddress.value = '';
+                            this.modalSshUsername.value = '';
+                            this.modalSshPassword.value = '';
+                            this.modalSshPort.value = '22';
+                            this.saveCredentials.checked = true;
+                        }
+                    }
+                } catch (error) {
+                    // If error loading devices, just clear fields
+                    this.modalIpAddress.value = '';
+                    this.modalSshUsername.value = '';
+                    this.modalSshPassword.value = '';
+                    this.modalSshPort.value = '22';
+                    this.saveCredentials.checked = true;
+                }
+                
+                // Show modal
+                this.shutdownModal.classList.add('show');
+            }
+
+            closeShutdownModal() {
+                this.shutdownModal.classList.remove('show');
+                this.currentShutdownDevice = null;
+            }
+
+            async discoverIPInModal() {
+                if (!this.currentShutdownDevice) return;
+                
+                const macAddress = this.currentShutdownDevice.mac;
+                
+                this.modalDiscoverIpButton.disabled = true;
+                this.modalDiscoverIpButton.textContent = '🔍 Discovering...';
+                
+                try {
+                    const response = await fetch('/api/discover-ip', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            mac_address: macAddress
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        this.modalIpAddress.value = data.ip_address;
+                        this.showStatus(`✅ Found IP: ${data.ip_address}`, 'success');
+                    } else {
+                        this.showStatus(`❌ ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    this.showStatus(`❌ Network error: ${error.message}`, 'error');
+                } finally {
+                    this.modalDiscoverIpButton.disabled = false;
+                    this.modalDiscoverIpButton.textContent = '🔍 Discover';
+                }
+            }
+
+            async executeShutdown() {
+                if (!this.currentShutdownDevice) return;
+                
+                const ipAddress = this.modalIpAddress.value.trim();
+                const username = this.modalSshUsername.value.trim();
+                const password = this.modalSshPassword.value.trim();
+                const port = parseInt(this.modalSshPort.value) || 22;
+
+                if (!ipAddress || !username || !password) {
+                    this.showStatus('❌ Please fill in all SSH credentials', 'error');
+                    return;
+                }
+
+                this.confirmShutdownButton.disabled = true;
+                this.confirmShutdownButton.textContent = '⚡ Force shutting down...';
+                this.showStatus(`Sending force shutdown command to ${this.currentShutdownDevice.deviceName}...`, 'loading');
+
+                try {
+                    // Create temporary device entry with SSH credentials
+                    const tempDevice = {
+                        mac: this.currentShutdownDevice.mac,
+                        ssh_enabled: true,
+                        ip_address: ipAddress,
+                        ssh_username: username,
+                        ssh_password: password,
+                        ssh_port: port
+                    };
+
+                    const requestData = {
+                        mac_address: this.currentShutdownDevice.mac,
+                        temp_ssh_credentials: {
+                            ip_address: ipAddress,
+                            username: username,
+                            password: password,
+                            port: port
+                        }
+                    };
+
+                    // If save credentials is checked, include that in the request
+                    if (this.saveCredentials.checked) {
+                        requestData.save_ssh_credentials = true;
+                    }
+
+                    const response = await fetch('/api/shutdown', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        this.showStatus(`✅ ${data.message}`, 'success');
+                        this.closeShutdownModal();
+                        this.loadStoredAddresses();
+                    } else {
+                        this.showStatus(`❌ Error: ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    this.showStatus(`❌ Network error: ${error.message}`, 'error');
+                } finally {
+                    this.confirmShutdownButton.disabled = false;
+                    this.confirmShutdownButton.textContent = '⚡ Force Shutdown';
+                }
             }
 
             async deleteDevice(mac) {

@@ -8,8 +8,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install wakeonlan command-line utility
-RUN apt-get update && apt-get install -y wakeonlan && rm -rf /var/lib/apt/lists/*
+# Install wakeonlan command-line utility and SSH client
+RUN apt-get update && apt-get install -y wakeonlan openssh-client && rm -rf /var/lib/apt/lists/*
 
 # Copy the rest of the application code
 COPY . .
