@@ -133,20 +133,247 @@ def validate_ip_address(ip):
         return False
 
 def discover_ip_from_mac(mac_address):
-    """Try to discover IP address from MAC address using ARP table."""
+    """Try multiple methods to discover IP address from MAC address."""
+    # Normalize MAC address formats for comparison
+    mac_normalized = mac_address.lower().replace('-', ':').replace('.', ':')
+    mac_formats = [
+        mac_normalized,
+        mac_normalized.replace(':', '-'),
+        mac_normalized.replace(':', ''),
+        mac_normalized.upper(),
+        mac_normalized.upper().replace(':', '-'),
+        mac_normalized.upper().replace(':', '')
+    ]
+    
+    logger.info(f"Attempting to discover IP for MAC: {mac_address}")
+    
+    # Method 1: ARP table lookup (multiple command formats)
+    ip = _discover_via_arp_table(mac_formats)
+    if ip:
+        logger.info(f"Found IP via ARP table: {ip}")
+        return ip
+    
+    # Method 2: Parse DHCP lease files
+    ip = _discover_via_dhcp_leases(mac_formats)
+    if ip:
+        logger.info(f"Found IP via DHCP leases: {ip}")
+        return ip
+    
+    # Method 3: Network scanning with ping sweep
+    ip = _discover_via_network_scan(mac_formats)
+    if ip:
+        logger.info(f"Found IP via network scan: {ip}")
+        return ip
+    
+    # Method 4: Use nmap if available
+    ip = _discover_via_nmap(mac_formats)
+    if ip:
+        logger.info(f"Found IP via nmap: {ip}")
+        return ip
+    
+    logger.warning(f"Could not discover IP for MAC {mac_address} using any method")
+    return None
+
+def _discover_via_arp_table(mac_formats):
+    """Try to find IP using ARP table with multiple command formats."""
+    import re
+    
+    # Try different ARP commands for different systems
+    arp_commands = [
+        ['arp', '-a'],                    # Most common
+        ['arp', '-e'],                    # Linux format
+        ['ip', 'neigh', 'show'],          # Modern Linux
+        ['cat', '/proc/net/arp'],         # Direct Linux ARP table
+    ]
+    
+    for cmd in arp_commands:
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode != 0:
+                continue
+                
+            for line in result.stdout.split('\n'):
+                line_lower = line.lower()
+                
+                # Check if any MAC format appears in this line
+                for mac_format in mac_formats:
+                    if mac_format.lower() in line_lower:
+                        # Try different IP extraction patterns
+                        ip_patterns = [
+                            r'\(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\)',  # (IP) format
+                            r'^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',     # IP at start
+                            r'([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',      # Any IP in line
+                        ]
+                        
+                        for pattern in ip_patterns:
+                            ip_match = re.search(pattern, line)
+                            if ip_match:
+                                ip = ip_match.group(1)
+                                if validate_ip_address(ip) and not ip.startswith('127.'):
+                                    return ip
+        except Exception as e:
+            logger.debug(f"ARP command {cmd} failed: {e}")
+            continue
+    
+    return None
+
+def _discover_via_dhcp_leases(mac_formats):
+    """Try to find IP in DHCP lease files."""
+    import re
+    
+    # Common DHCP lease file locations
+    dhcp_lease_files = [
+        '/var/lib/dhcp/dhcpd.leases',
+        '/var/lib/dhcpcd5/dhcpcd.leases',
+        '/var/lib/NetworkManager/dhclient.leases',
+        '/var/lib/dhcp/dhclient.leases',
+        '/tmp/dhcpcd.leases',
+    ]
+    
+    for lease_file in dhcp_lease_files:
+        try:
+            with open(lease_file, 'r') as f:
+                content = f.read()
+                
+                # Look for lease blocks with our MAC address
+                for mac_format in mac_formats:
+                    # DHCP lease format: lease IP { ... hardware ethernet MAC; ... }
+                    pattern = rf'lease\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\s*\{{[^}}]*hardware\s+ethernet\s+{re.escape(mac_format)}[^}}]*\}}'
+                    matches = re.findall(pattern, content, re.IGNORECASE | re.DOTALL)
+                    
+                    if matches:
+                        ip = matches[-1]  # Get the most recent lease
+                        if validate_ip_address(ip):
+                            return ip
+        except Exception as e:
+            logger.debug(f"Could not read DHCP lease file {lease_file}: {e}")
+            continue
+    
+    return None
+
+def _discover_via_network_scan(mac_formats):
+    """Try to find IP by scanning common network ranges."""
+    import socket
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
     try:
-        result = subprocess.run(['arp', '-a'], capture_output=True, text=True, timeout=5)
-        for line in result.stdout.split('\n'):
-            if mac_address.lower().replace('-', ':') in line.lower():
-                # Extract IP from ARP entry
-                import re
-                ip_match = re.search(r'\((.*?)\)', line)
-                if ip_match:
-                    ip = ip_match.group(1)
+        # Get local network ranges to scan
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        
+        # Generate network ranges based on local IP
+        network_ranges = []
+        ip_parts = local_ip.split('.')
+        
+        # Common private network ranges
+        common_ranges = [
+            f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}",  # Same subnet
+            "192.168.1",    # Common home network
+            "192.168.0",    # Common home network
+            "10.0.0",       # Common corporate network
+            "172.16.0",     # Common corporate network
+        ]
+        
+        # Remove duplicates
+        network_ranges = list(set(common_ranges))
+        
+        def check_ip_for_mac(ip):
+            """Check if an IP has our target MAC address."""
+            try:
+                # Ping the IP to populate ARP table (try different ping formats)
+                ping_commands = [
+                    ['ping', '-c', '1', '-W', '1', ip],     # Linux format
+                    ['ping', '-n', '1', '-w', '1000', ip], # Windows format
+                    ['ping', '-c', '1', ip],                # Basic format
+                ]
+                
+                ping_success = False
+                for ping_cmd in ping_commands:
+                    try:
+                        ping_result = subprocess.run(ping_cmd, capture_output=True, timeout=2)
+                        if ping_result.returncode == 0:
+                            ping_success = True
+                            break
+                    except Exception:
+                        continue
+                
+                if ping_success:
+                    # Check ARP table for this specific IP
+                    arp_result = subprocess.run(
+                        ['arp', '-n', ip], 
+                        capture_output=True, 
+                        text=True, 
+                        timeout=1
+                    )
+                    
+                    if arp_result.returncode == 0:
+                        line_lower = arp_result.stdout.lower()
+                        for mac_format in mac_formats:
+                            if mac_format.lower() in line_lower:
+                                return ip
+                                
+            except Exception:
+                pass
+            return None
+        
+        # Scan each network range (limit to first 20 IPs for performance)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = []
+            
+            for network_range in network_ranges[:3]:  # Limit to 3 ranges
+                for i in range(1, 21):  # Check .1 to .20
+                    ip = f"{network_range}.{i}"
                     if validate_ip_address(ip):
-                        return ip
+                        futures.append(executor.submit(check_ip_for_mac, ip))
+            
+            # Check results as they complete (with timeout)
+            for future in as_completed(futures, timeout=10):
+                try:
+                    result = future.result()
+                    if result:
+                        return result
+                except Exception:
+                    continue
+                    
     except Exception as e:
-        logger.warning(f"Could not discover IP from MAC {mac_address}: {e}")
+        logger.debug(f"Network scan failed: {e}")
+    
+    return None
+
+def _discover_via_nmap(mac_formats):
+    """Try to find IP using nmap if available."""
+    try:
+        # Check if nmap is available
+        subprocess.run(['nmap', '--version'], capture_output=True, timeout=2)
+        
+        # Use nmap to scan local network
+        result = subprocess.run([
+            'nmap', '-sn', '192.168.1.0/24'  # Scan common home network
+        ], capture_output=True, text=True, timeout=15)
+        
+        if result.returncode == 0:
+            lines = result.stdout.split('\n')
+            current_ip = None
+            
+            for line in lines:
+                # nmap output: "Nmap scan report for 192.168.1.100"
+                if 'Nmap scan report for' in line:
+                    import re
+                    ip_match = re.search(r'([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)', line)
+                    if ip_match:
+                        current_ip = ip_match.group(1)
+                
+                # nmap output: "MAC Address: AA:BB:CC:DD:EE:FF"
+                elif 'MAC Address:' in line and current_ip:
+                    line_lower = line.lower()
+                    for mac_format in mac_formats:
+                        if mac_format.lower() in line_lower:
+                            return current_ip
+                            
+    except Exception as e:
+        logger.debug(f"nmap discovery failed: {e}")
+    
     return None
 
 def execute_ssh_shutdown(ip_address, username, password, port=22):

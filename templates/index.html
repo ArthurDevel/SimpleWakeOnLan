@@ -745,7 +745,8 @@
                 const macAddress = this.currentShutdownDevice.mac;
                 
                 this.modalDiscoverIpButton.disabled = true;
-                this.modalDiscoverIpButton.textContent = '🔍 Discovering...';
+                this.modalDiscoverIpButton.textContent = '🔍 Scanning networks...';
+                this.showStatus('🔍 Discovering IP... (checking ARP table, DHCP leases, network scan)', 'loading');
                 
                 try {
                     const response = await fetch('/api/discover-ip', {
